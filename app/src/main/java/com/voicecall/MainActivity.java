@@ -46,8 +46,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int DISCOVERY_PORT = 50006;
     private static final int SAMPLE_RATE = 8000;
     private static final int BUFFER_SIZE = 1024;
-    private static final int RECONNECT_TIMEOUT_MS = 5000;
-    private static final int MAX_RECONNECT_ATTEMPTS = 3;
+    private static final int RECONNECT_TIMEOUT_MS = 30000;
+    private static final int MAX_RECONNECT_ATTEMPTS = 10;
     private static final String FIXED_KEY = "VoiceCallAppKey1";
 
     private Button btnHost, btnCall, btnEndCall, btnMute, btnSpeaker;
@@ -335,10 +335,7 @@ public class MainActivity extends AppCompatActivity {
         btnMute.setVisibility(View.VISIBLE);
         btnSpeaker.setVisibility(View.VISIBLE);
         soundPool.play(soundConnect, 1f, 1f, 0, 0, 1f);
-        if (!hasVibrated) {
-            vibrate();
-            hasVibrated = true;
-        }
+
         timerHandler.post(timerRunnable);
         qualityHandler.post(qualityRunnable);
         if (serviceBound && callService != null)

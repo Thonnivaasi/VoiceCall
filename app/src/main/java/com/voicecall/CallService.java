@@ -62,7 +62,8 @@ public class CallService extends Service {
                 .setContentIntent(openPending)
                 .addAction(android.R.drawable.ic_delete, "End Call", endPending)
                 .setOngoing(true)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setSilent(true)
                 .build();
     }
 
