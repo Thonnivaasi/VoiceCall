@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1a1a2e">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="24dp">
+
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@mipmap/ic_launcher"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:text="VoiceCall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="32sp"
+            android:textColor="#ffffff"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:text="Secure Local WiFi Calling"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="#888888"
+            android:layout_marginBottom="24dp"/>
+
+        <TextView
+            android:id="@+id/tvRoomCode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="28sp"
+            android:textColor="#00d4ff"
+            android:textStyle="bold"
+            android:letterSpacing="0.3"
+            android:visibility="gone"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:id="@+id/tvLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="#888888"
+            android:visibility="gone"
+            android:layout_marginBottom="20dp"/>
+
+        <TextView
+            android:id="@+id/tvTimer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="40sp"
+            android:textColor="#ffffff"
+            android:textStyle="bold"
+            android:text="00:00"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/tvQuality"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="#aaaaaa"
+            android:text="Signal: --"
+            android:visibility="gone"
+            android:layout_marginBottom="24dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PIN (both phones must use same PIN)"
+            android:textSize="12sp"
+            android:textColor="#888888"
+            android:layout_marginBottom="6dp"/>
+
+        <EditText
+            android:id="@+id/etPin"
+            android:layout_width="240dp"
+            android:layout_height="52dp"
+            android:hint="Enter PIN"
+            android:textColorHint="#555555"
+            android:textColor="#ffffff"
+            android:backgroundTint="#2a2a4a"
+            android:inputType="numberPassword"
+            android:gravity="center"
+            android:layout_marginBottom="20dp"/>
+
+        <Button
+            android:id="@+id/btnHost"
+            android:layout_width="240dp"
+            android:layout_height="52dp"
+            android:text="HOST - Create Room"
+            android:backgroundTint="#0f3460"
+            android:textColor="#ffffff"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="240dp"
+            android:layout_height="wrap_content"
+            android:text="─────── or ───────"
+            android:textColor="#444444"
+            android:gravity="center"
+            android:layout_marginBottom="16dp"/>
+
+        <EditText
+            android:id="@+id/etRoomCode"
+            android:layout_width="240dp"
+            android:layout_height="52dp"
+            android:hint="Enter 6-digit room code"
+            android:textColorHint="#555555"
+            android:textColor="#ffffff"
+            android:backgroundTint="#2a2a4a"
+            android:inputType="number"
+            android:maxLength="6"
+            android:gravity="center"
+            android:textSize="20sp"
+            android:letterSpacing="0.3"
+            android:layout_marginBottom="12dp"/>
+
+        <Button
+            android:id="@+id/btnCall"
+            android:layout_width="240dp"
+            android:layout_height="52dp"
+            android:text="CALL - Join Room"
+            android:backgroundTint="#16213e"
+            android:textColor="#ffffff"
+            android:layout_marginBottom="32dp"/>
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="#cccccc"
+            android:text="Status: Idle"
+            android:layout_marginBottom="24dp"/>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <Button
+                android:id="@+id/btnMute"
+                android:layout_width="120dp"
+                android:layout_height="52dp"
+                android:text="🎤 MUTE"
+                android:backgroundTint="@android:color/holo_blue_dark"
+                android:textColor="#ffffff"
+                android:visibility="gone"
+                android:layout_marginEnd="12dp"/>
+
+            <Button
+                android:id="@+id/btnSpeaker"
+                android:layout_width="130dp"
+                android:layout_height="52dp"
+                android:text="🔊 SPEAKER"
+                android:backgroundTint="@android:color/holo_blue_dark"
+                android:textColor="#ffffff"
+                android:visibility="gone"/>
+
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnEndCall"
+            android:layout_width="240dp"
+            android:layout_height="56dp"
+            android:text="📵 END CALL"
+            android:backgroundTint="#e94560"
+            android:textColor="#ffffff"
+            android:textStyle="bold"
+            android:visibility="gone"/>
+
+    </LinearLayout>
+</ScrollView>
