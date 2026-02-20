@@ -211,7 +211,8 @@ public class MainActivity extends AppCompatActivity {
 
                 // Try multiple times with all subnets
                 for (int attempt = 0; attempt < 5 && hostAddress == null; attempt++) {
-                    runOnUiThread(() -> tvStatus.setText("Status: Searching... attempt " + (attempt + 1)));
+                    final int attemptNum = attempt + 1;
+                    runOnUiThread(() -> tvStatus.setText("Status: Searching... " + attemptNum + "/5"));
 
                     for (String subnet : subnets) {
                         try {
