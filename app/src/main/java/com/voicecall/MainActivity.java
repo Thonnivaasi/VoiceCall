@@ -48,38 +48,33 @@ public class MainActivity extends AppCompatActivity {
     private static final int BUFFER_SIZE = 1024;
     private static final int RECONNECT_TIMEOUT_MS = 5000;
     private static final int MAX_RECONNECT_ATTEMPTS = 3;
+    private static final String FIXED_KEY = "VoiceCallAppKey1";
 
     private Button btnHost, btnCall, btnEndCall, btnMute, btnSpeaker;
-    private EditText etRoomCode, etPin;
+    private EditText etRoomCode;
     private TextView tvStatus, tvRoomCode, tvTimer, tvQuality, tvLabel;
-
     private AudioRecord audioRecord;
     private AudioTrack audioTrack;
     private AudioManager audioManager;
     private SoundPool soundPool;
     private int soundDial, soundConnect, soundDisconnect;
-
     private DatagramSocket audioSocket;
     private DatagramSocket discoverySocket;
     private InetAddress remoteAddress;
     private int remotePort;
-
     private AtomicBoolean isRunning = new AtomicBoolean(false);
     private AtomicBoolean isMuted = new AtomicBoolean(false);
     private boolean isSpeakerOn = false;
-    private boolean isHost = false;
     private String currentRoomCode;
-    private String currentPin;
     private int reconnectAttempts = 0;
     private long callStartTime;
     private long lastPacketTime;
-
     private Handler timerHandler = new Handler(Looper.getMainLooper());
     private Handler qualityHandler = new Handler(Looper.getMainLooper());
-
     private CallService callService;
     private boolean serviceBound = false;
     private byte[] encryptionKey;
+    private boolean hasVibrated = false;
 
     private ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
@@ -89,95 +84,69 @@ public class MainActivity extends AppCompatActivity {
             serviceBound = true;
         }
         @Override
-        public void onServiceDisconnected(ComponentName name) {
-            serviceBound = false;
-        }
+        public void onServiceDisconnected(ComponentName name) { serviceBound = false; }
     };
 
     private BroadcastReceiver endCallReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent) {
-            endCall();
-        }
+        public void onReceive(Context context, Intent intent) { endCall(); }
     };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         btnHost = findViewById(R.id.btnHost);
         btnCall = findViewById(R.id.btnCall);
         btnEndCall = findViewById(R.id.btnEndCall);
         btnMute = findViewById(R.id.btnMute);
         btnSpeaker = findViewById(R.id.btnSpeaker);
         etRoomCode = findViewById(R.id.etRoomCode);
-        etPin = findViewById(R.id.etPin);
         tvStatus = findViewById(R.id.tvStatus);
         tvRoomCode = findViewById(R.id.tvRoomCode);
         tvTimer = findViewById(R.id.tvTimer);
         tvQuality = findViewById(R.id.tvQuality);
         tvLabel = findViewById(R.id.tvLabel);
-
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-
         soundPool = new SoundPool.Builder().setMaxStreams(3).build();
         soundDial = soundPool.load(this, R.raw.dial_tone, 1);
         soundConnect = soundPool.load(this, R.raw.connect_tone, 1);
         soundDisconnect = soundPool.load(this, R.raw.disconnect_tone, 1);
-
         String[] perms = {Manifest.permission.RECORD_AUDIO};
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            perms = new String[]{Manifest.permission.RECORD_AUDIO,
-                    Manifest.permission.POST_NOTIFICATIONS};
+            perms = new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS};
         }
         ActivityCompat.requestPermissions(this, perms, 1);
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(endCallReceiver,
-                    new IntentFilter("com.voicecall.END_CALL_ACTION"),
-                    Context.RECEIVER_NOT_EXPORTED);
+            registerReceiver(endCallReceiver, new IntentFilter("com.voicecall.END_CALL_ACTION"), Context.RECEIVER_NOT_EXPORTED);
         } else {
-            registerReceiver(endCallReceiver,
-                    new IntentFilter("com.voicecall.END_CALL_ACTION"));
+            registerReceiver(endCallReceiver, new IntentFilter("com.voicecall.END_CALL_ACTION"));
         }
-
         btnHost.setOnClickListener(v -> {
             if (!checkPermission()) { tvStatus.setText("Status: Mic permission needed!"); return; }
-            String pin = etPin.getText().toString().trim();
-            if (pin.isEmpty()) { tvStatus.setText("Status: Enter a PIN first!"); return; }
-            startHostMode(pin);
+            startHostMode();
         });
-
         btnCall.setOnClickListener(v -> {
             if (!checkPermission()) { tvStatus.setText("Status: Mic permission needed!"); return; }
             String code = etRoomCode.getText().toString().trim();
-            String pin = etPin.getText().toString().trim();
             if (code.length() != 6) { tvStatus.setText("Status: Enter 6 digit room code!"); return; }
-            if (pin.isEmpty()) { tvStatus.setText("Status: Enter PIN!"); return; }
-            connectToHost(code, pin);
+            connectToHost(code);
         });
-
         btnEndCall.setOnClickListener(v -> endCall());
         btnMute.setOnClickListener(v -> toggleMute());
         btnSpeaker.setOnClickListener(v -> toggleSpeaker());
     }
 
-    private void startHostMode(String pin) {
+    private void startHostMode() {
         currentRoomCode = String.format("%06d", new Random().nextInt(999999));
-        currentPin = pin;
-        encryptionKey = deriveKey(currentRoomCode + pin);
-        isHost = true;
-
+        encryptionKey = deriveKey(currentRoomCode + FIXED_KEY);
         tvRoomCode.setText("Room Code: " + currentRoomCode);
         tvRoomCode.setVisibility(View.VISIBLE);
         tvLabel.setText("Share this code with the other phone");
         tvLabel.setVisibility(View.VISIBLE);
         tvStatus.setText("Status: Waiting for call...");
-
         soundPool.play(soundDial, 1f, 1f, 0, 0, 1f);
         startCallService();
-
         new Thread(() -> {
             try {
                 discoverySocket = new DatagramSocket(DISCOVERY_PORT);
@@ -186,18 +155,16 @@ public class MainActivity extends AppCompatActivity {
                 while (!isRunning.get()) {
                     discoverySocket.receive(pkt);
                     String msg = new String(pkt.getData(), 0, pkt.getLength());
-                    if (msg.startsWith("FIND:" + currentRoomCode + ":" + pin)) {
+                    if (msg.startsWith("FIND:" + currentRoomCode)) {
                         String myIp = getDeviceIpAddress();
                         String response = "HOST:" + myIp + ":" + AUDIO_PORT;
                         byte[] resp = response.getBytes();
-                        discoverySocket.send(new DatagramPacket(resp, resp.length,
-                                pkt.getAddress(), pkt.getPort()));
+                        discoverySocket.send(new DatagramPacket(resp, resp.length, pkt.getAddress(), pkt.getPort()));
                         runOnUiThread(() -> tvStatus.setText("Status: Guest found! Connecting..."));
                     }
                 }
             } catch (Exception ignored) {}
         }).start();
-
         new Thread(() -> {
             try {
                 audioSocket = new DatagramSocket(AUDIO_PORT);
@@ -211,38 +178,29 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(this::onCallConnected);
                 startAudioStreaming();
             } catch (Exception e) {
-                if (isRunning.get())
-                    runOnUiThread(() -> tvStatus.setText("Status: Error - " + e.getMessage()));
+                if (isRunning.get()) runOnUiThread(() -> tvStatus.setText("Status: Error - " + e.getMessage()));
             }
         }).start();
     }
 
-    private void connectToHost(String roomCode, String pin) {
+    private void connectToHost(String roomCode) {
         currentRoomCode = roomCode;
-        currentPin = pin;
-        encryptionKey = deriveKey(roomCode + pin);
-        isHost = false;
+        encryptionKey = deriveKey(roomCode + FIXED_KEY);
         tvStatus.setText("Status: Searching for host...");
         soundPool.play(soundDial, 1f, 1f, 0, -1, 1f);
         startCallService();
-
         new Thread(() -> {
             try {
                 DatagramSocket discSocket = new DatagramSocket();
                 discSocket.setSoTimeout(3000);
-                String findMsg = "FIND:" + roomCode + ":" + pin;
+                String findMsg = "FIND:" + roomCode;
                 byte[] findBytes = findMsg.getBytes();
-                String[] subnets = {"192.168.43.255", "192.168.1.255", "192.168.0.255",
-                        "10.0.0.255", "172.20.10.255"};
+                String[] subnets = {"192.168.43.255", "192.168.1.255", "192.168.0.255", "10.0.0.255", "172.20.10.255"};
                 InetAddress hostAddress = null;
                 int hostPort = AUDIO_PORT;
-
                 for (int attempt = 0; attempt < 3 && hostAddress == null; attempt++) {
                     for (String subnet : subnets) {
-                        try {
-                            discSocket.send(new DatagramPacket(findBytes, findBytes.length,
-                                    InetAddress.getByName(subnet), DISCOVERY_PORT));
-                        } catch (Exception ignored) {}
+                        try { discSocket.send(new DatagramPacket(findBytes, findBytes.length, InetAddress.getByName(subnet), DISCOVERY_PORT)); } catch (Exception ignored) {}
                     }
                     try {
                         byte[] respBuf = new byte[256];
@@ -257,16 +215,10 @@ public class MainActivity extends AppCompatActivity {
                     } catch (Exception ignored) {}
                 }
                 discSocket.close();
-
                 if (hostAddress == null) {
-                    runOnUiThread(() -> {
-                        soundPool.stop(soundDial);
-                        tvStatus.setText("Status: Host not found. Check code & PIN.");
-                        stopCallService();
-                    });
+                    runOnUiThread(() -> { soundPool.stop(soundDial); tvStatus.setText("Status: Host not found. Check room code."); stopCallService(); });
                     return;
                 }
-
                 remoteAddress = hostAddress;
                 remotePort = hostPort;
                 audioSocket = new DatagramSocket();
@@ -274,40 +226,21 @@ public class MainActivity extends AppCompatActivity {
                 audioSocket.send(new DatagramPacket(hello, hello.length, remoteAddress, remotePort));
                 isRunning.set(true);
                 lastPacketTime = System.currentTimeMillis();
-                runOnUiThread(() -> {
-                    soundPool.stop(soundDial);
-                    onCallConnected();
-                });
+                runOnUiThread(() -> { soundPool.stop(soundDial); onCallConnected(); });
                 startAudioStreaming();
-
             } catch (Exception e) {
-                runOnUiThread(() -> {
-                    soundPool.stop(soundDial);
-                    tvStatus.setText("Status: Error - " + e.getMessage());
-                    stopCallService();
-                });
+                runOnUiThread(() -> { soundPool.stop(soundDial); tvStatus.setText("Status: Error - " + e.getMessage()); stopCallService(); });
             }
         }).start();
     }
 
     private void startAudioStreaming() {
-        int minBuffer = AudioRecord.getMinBufferSize(SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        int minBuffer = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         if (!checkPermission()) return;
-
-        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
-                Math.max(minBuffer, BUFFER_SIZE * 2));
-
-        audioTrack = new AudioTrack(AudioManager.STREAM_VOICE_CALL, SAMPLE_RATE,
-                AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
-                Math.max(AudioTrack.getMinBufferSize(SAMPLE_RATE,
-                        AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT),
-                        BUFFER_SIZE * 2), AudioTrack.MODE_STREAM);
-
+        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, Math.max(minBuffer, BUFFER_SIZE * 2));
+        audioTrack = new AudioTrack(AudioManager.STREAM_VOICE_CALL, SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT, Math.max(AudioTrack.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT), BUFFER_SIZE * 2), AudioTrack.MODE_STREAM);
         audioRecord.startRecording();
         audioTrack.play();
-
         new Thread(() -> {
             byte[] buffer = new byte[BUFFER_SIZE];
             while (isRunning.get()) {
@@ -316,16 +249,11 @@ public class MainActivity extends AppCompatActivity {
                     if (read > 0) {
                         byte[] data = isMuted.get() ? new byte[read] : buffer.clone();
                         byte[] encrypted = encryptData(data);
-                        audioSocket.send(new DatagramPacket(encrypted, encrypted.length,
-                                remoteAddress, remotePort));
+                        audioSocket.send(new DatagramPacket(encrypted, encrypted.length, remoteAddress, remotePort));
                     }
-                } catch (Exception e) {
-                    if (isRunning.get()) attemptReconnect();
-                    break;
-                }
+                } catch (Exception e) { if (isRunning.get()) attemptReconnect(); break; }
             }
         }).start();
-
         new Thread(() -> {
             byte[] buffer = new byte[BUFFER_SIZE + 64];
             while (isRunning.get()) {
@@ -337,18 +265,11 @@ public class MainActivity extends AppCompatActivity {
                     byte[] decrypted = decryptData(pkt.getData(), pkt.getLength());
                     if (decrypted != null) audioTrack.write(decrypted, 0, decrypted.length);
                 } catch (java.net.SocketTimeoutException e) {
-                    if (isRunning.get()) {
-                        runOnUiThread(() -> tvStatus.setText("Status: Connection weak..."));
-                        attemptReconnect();
-                    }
+                    if (isRunning.get()) { runOnUiThread(() -> tvStatus.setText("Status: Connection weak...")); attemptReconnect(); }
                     break;
-                } catch (Exception e) {
-                    if (isRunning.get()) attemptReconnect();
-                    break;
-                }
+                } catch (Exception e) { if (isRunning.get()) attemptReconnect(); break; }
             }
         }).start();
-
         qualityHandler.postDelayed(qualityRunnable, 2000);
     }
 
@@ -357,12 +278,10 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             if (isRunning.get()) {
                 long t = System.currentTimeMillis() - lastPacketTime;
-                String quality = t < 200 ? "Excellent" : t < 500 ? "Good" :
-                        t < 1500 ? "Poor" : "No Signal";
+                String quality = t < 200 ? "Excellent" : t < 500 ? "Good" : t < 1500 ? "Poor" : "No Signal";
                 tvQuality.setText("Signal: " + quality);
                 if (serviceBound && callService != null)
-                    callService.updateNotification("Call Active",
-                            "Duration: " + tvTimer.getText() + " | " + quality);
+                    callService.updateNotification("Call Active", "Duration: " + tvTimer.getText() + " | " + quality);
                 qualityHandler.postDelayed(this, 2000);
             }
         }
@@ -383,10 +302,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void attemptReconnect() {
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            runOnUiThread(() -> {
-                tvStatus.setText("Status: Call dropped.");
-                soundPool.play(soundDisconnect, 1f, 1f, 0, 0, 1f);
-            });
+            runOnUiThread(() -> { tvStatus.setText("Status: Call dropped."); soundPool.play(soundDisconnect, 1f, 1f, 0, 0, 1f); });
             return;
         }
         reconnectAttempts++;
@@ -406,6 +322,7 @@ public class MainActivity extends AppCompatActivity {
     private void onCallConnected() {
         callStartTime = System.currentTimeMillis();
         reconnectAttempts = 0;
+        hasVibrated = false;
         tvStatus.setText("Status: Connected!");
         tvRoomCode.setVisibility(View.GONE);
         tvLabel.setVisibility(View.GONE);
@@ -414,12 +331,14 @@ public class MainActivity extends AppCompatActivity {
         btnHost.setVisibility(View.GONE);
         btnCall.setVisibility(View.GONE);
         etRoomCode.setVisibility(View.GONE);
-        etPin.setVisibility(View.GONE);
         btnEndCall.setVisibility(View.VISIBLE);
         btnMute.setVisibility(View.VISIBLE);
         btnSpeaker.setVisibility(View.VISIBLE);
         soundPool.play(soundConnect, 1f, 1f, 0, 0, 1f);
-        vibrate();
+        if (!hasVibrated) {
+            vibrate();
+            hasVibrated = true;
+        }
         timerHandler.post(timerRunnable);
         qualityHandler.post(qualityRunnable);
         if (serviceBound && callService != null)
@@ -427,11 +346,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void endCall() {
-        if (!isRunning.get() && audioSocket == null) {
-            resetUI();
-            stopCallService();
-            return;
-        }
+        if (!isRunning.get() && audioSocket == null) { resetUI(); stopCallService(); return; }
         isRunning.set(false);
         timerHandler.removeCallbacks(timerRunnable);
         qualityHandler.removeCallbacks(qualityRunnable);
@@ -443,8 +358,13 @@ public class MainActivity extends AppCompatActivity {
             try { if (discoverySocket != null) discoverySocket.close(); } catch (Exception ignored) {}
             audioRecord = null; audioTrack = null; audioSocket = null; discoverySocket = null; remoteAddress = null;
         }).start();
-        if (isSpeakerOn) { audioManager.setSpeakerphoneOn(false); isSpeakerOn = false; }
+        if (isSpeakerOn) {
+            audioManager.setMode(AudioManager.MODE_NORMAL);
+            audioManager.setSpeakerphoneOn(false);
+            isSpeakerOn = false;
+        }
         isMuted.set(false);
+        hasVibrated = false;
         stopCallService();
         resetUI();
     }
@@ -460,7 +380,6 @@ public class MainActivity extends AppCompatActivity {
             btnHost.setVisibility(View.VISIBLE);
             btnCall.setVisibility(View.VISIBLE);
             etRoomCode.setVisibility(View.VISIBLE);
-            etPin.setVisibility(View.VISIBLE);
             btnEndCall.setVisibility(View.GONE);
             btnMute.setVisibility(View.GONE);
             btnSpeaker.setVisibility(View.GONE);
@@ -475,16 +394,20 @@ public class MainActivity extends AppCompatActivity {
         boolean muted = !isMuted.get();
         isMuted.set(muted);
         btnMute.setText(muted ? "UNMUTE" : "MUTE");
-        btnMute.setBackgroundTintList(getColorStateList(
-                muted ? android.R.color.holo_red_dark : android.R.color.holo_blue_dark));
+        btnMute.setBackgroundTintList(getColorStateList(muted ? android.R.color.holo_red_dark : android.R.color.holo_blue_dark));
     }
 
     private void toggleSpeaker() {
         isSpeakerOn = !isSpeakerOn;
-        audioManager.setSpeakerphoneOn(isSpeakerOn);
+        if (isSpeakerOn) {
+            audioManager.setMode(AudioManager.MODE_NORMAL);
+            audioManager.setSpeakerphoneOn(true);
+        } else {
+            audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            audioManager.setSpeakerphoneOn(false);
+        }
         btnSpeaker.setText(isSpeakerOn ? "EARPIECE" : "SPEAKER");
-        btnSpeaker.setBackgroundTintList(getColorStateList(
-                isSpeakerOn ? android.R.color.holo_green_dark : android.R.color.holo_blue_dark));
+        btnSpeaker.setBackgroundTintList(getColorStateList(isSpeakerOn ? android.R.color.holo_green_dark : android.R.color.holo_blue_dark));
     }
 
     private void vibrate() {
@@ -548,8 +471,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean checkPermission() {
-        return ActivityCompat.checkSelfPermission(this,
-                Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void startCallService() {

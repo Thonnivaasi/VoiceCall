@@ -75,26 +75,6 @@
             android:visibility="gone"
             android:layout_marginBottom="24dp"/>
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="PIN (both phones must use same PIN)"
-            android:textSize="12sp"
-            android:textColor="#888888"
-            android:layout_marginBottom="6dp"/>
-
-        <EditText
-            android:id="@+id/etPin"
-            android:layout_width="240dp"
-            android:layout_height="52dp"
-            android:hint="Enter PIN"
-            android:textColorHint="#555555"
-            android:textColor="#ffffff"
-            android:backgroundTint="#2a2a4a"
-            android:inputType="numberPassword"
-            android:gravity="center"
-            android:layout_marginBottom="20dp"/>
-
         <Button
             android:id="@+id/btnHost"
             android:layout_width="240dp"
@@ -155,7 +135,7 @@
                 android:id="@+id/btnMute"
                 android:layout_width="120dp"
                 android:layout_height="52dp"
-                android:text="🎤 MUTE"
+                android:text="MUTE"
                 android:backgroundTint="@android:color/holo_blue_dark"
                 android:textColor="#ffffff"
                 android:visibility="gone"
@@ -165,7 +145,7 @@
                 android:id="@+id/btnSpeaker"
                 android:layout_width="130dp"
                 android:layout_height="52dp"
-                android:text="🔊 SPEAKER"
+                android:text="SPEAKER"
                 android:backgroundTint="@android:color/holo_blue_dark"
                 android:textColor="#ffffff"
                 android:visibility="gone"/>
@@ -176,7 +156,7 @@
             android:id="@+id/btnEndCall"
             android:layout_width="240dp"
             android:layout_height="56dp"
-            android:text="📵 END CALL"
+            android:text="END CALL"
             android:backgroundTint="#e94560"
             android:textColor="#ffffff"
             android:textStyle="bold"
