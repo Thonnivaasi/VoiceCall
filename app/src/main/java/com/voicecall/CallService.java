@@ -35,7 +35,7 @@ public class CallService extends Service {
             return START_NOT_STICKY;
         }
         createNotificationChannel();
-        startForeground(NOTIFICATION_ID, buildNotification("📞 Call Active", "VoiceCall is running..."));
+        startForeground(NOTIFICATION_ID, buildNotification("Call Active", "VoiceCall is running"));
         return START_STICKY;
     }
 
@@ -64,14 +64,17 @@ public class CallService extends Service {
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setSilent(true)
+                .setOnlyAlertOnce(true)
                 .build();
     }
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "VoiceCall", NotificationManager.IMPORTANCE_HIGH);
-            channel.setDescription("VoiceCall active call notification");
+                    CHANNEL_ID, "VoiceCall", NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription("VoiceCall active call");
+            channel.setSound(null, null);
+            channel.enableVibration(false);
             NotificationManager manager = getSystemService(NotificationManager.class);
             manager.createNotificationChannel(channel);
         }
